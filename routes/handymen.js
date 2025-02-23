@@ -4,79 +4,88 @@ function getAll(req, res) {
     HandyMan.find().then((handymen) => {
         res.send(handymen);
     }).catch((err) => {
-        res.send(err);
+        res.status(500).send(err);
     });
 }
 
 function getOne(req, res) {
-    let id = req.params.id;
-    HandyMan.findById(id)
+    let userId = parseInt(req.params.id); // Conversion en Number
+    HandyMan.findOne({ userId: userId })
         .then((handyman) => {
             if (!handyman) {
-                res.status(404).send('handyman not found');
+                res.status(404).send({ message: 'Handyman not found' });
             } else {
                 res.send(handyman);
             }
         })
         .catch((err) => {
-            res.send(err);
+            res.status(500).send(err);
         });
 }
 
-function create(req, res) {
-    let handyman = new HandyMan();
-    handyman.name = req.body.name;
-    handyman.avatarUrl = req.body.avatarUrl;
-    handyman.aboutMe = req.body.aboutMe;
-    handyman.phone = req.body.phone;
-    handyman.address = req.body.address;
-    handyman.isFavorite = req.body.isFavorite;
-    handyman.webSite = req.body.webSite;
+async function create(req, res) {
+    try {
+        let lastHandyman = await HandyMan.findOne().sort({ userId: -1 });
 
-    console.log(handyman)
+        let newUserId = (lastHandyman && !isNaN(lastHandyman.userId)) ? lastHandyman.userId + 1 : 1;
 
-    handyman.save()
-        .then((handyman) => {
-                res.json({message: `${handyman.name} saved with id ${handyman.id}!`});
-            }
-        ).catch((err) => {
-        res.send('cant post handyman ', err);
-    });
+        if (isNaN(newUserId) || newUserId <= 0) {
+            newUserId = 1; // Fallback de sécurité
+        }
+
+        let handyman = new HandyMan({
+            userId: newUserId, // ✅ Utilisation d'un `userId` valide
+            name: req.body.name,
+            avatarUrl: req.body.avatarUrl,
+            address: req.body.address,
+            phoneNumber: req.body.phoneNumber,
+            aboutMe: req.body.aboutMe,
+            favorite: req.body.favorite,
+            facebookUrl: req.body.facebookUrl,
+            linkedinUrl: req.body.linkedinUrl
+        });
+
+        await handyman.save();
+        res.json({ message: `${handyman.name} saved with userId ${handyman.userId}!` });
+
+    } catch (err) {
+        console.error('Error creating handyman:', err);
+        res.status(500).send({ message: 'Error saving handyman', error: err });
+    }
 }
 
 async function update(req, res) {
-    console.log(req.body);
     try {
-        const handyman = await HandyMan.findByIdAndUpdate(req.params.id, req.body, {new: true});
+        let userId = parseInt(req.params.id); // Convertir en Number
+        const handyman = await HandyMan.findOneAndUpdate({ userId: userId }, req.body, { new: true });
 
         if (!handyman) {
-            return res.status(404).json({message: 'handyman not found'});
+            return res.status(404).json({ message: 'Handyman not found' });
         }
 
-        res.json({message: 'Updated successfully', handyman: handyman});
+        res.json({ message: 'Updated successfully', handyman });
+
     } catch (err) {
         console.error('Error updating handyman:', err);
         res.status(500).send(err);
     }
-
-
 }
 
 async function deleteOne(req, res) {
     try {
-        const handyman = await HandyMan.findByIdAndDelete(req.params.id);
+        let userId = parseInt(req.params.id); // Convertir en Number
+        const handyman = await HandyMan.findOneAndDelete({ userId: userId });
 
         if (!handyman) {
-            return res.status(404).json({message: 'handyman not found'});
+            return res.status(404).json({ message: 'Handyman not found' });
         }
 
-        res.json({message: `${handyman.name} deleted successfully`});
+        res.json({ message: `${handyman.name} deleted successfully` });
+
     } catch (err) {
         console.error('Error deleting handyman:', err);
         res.status(500).send(err);
     }
-
 }
 
-
-module.exports = {getAll, create, getOne, update, deleteOne};
+module.exports = { getAll, create, getOne, update, deleteOne };
